@@ -4,17 +4,20 @@ from tkinter import messagebox  # Import messagebox to show popup messages
 from tkinter import ttk  # Import ttk for themed widgets (e.g., buttons, labels)
 import psycopg2  # Import psycopg2 to connect and interact with PostgreSQL database
 
-
 # Function to connect and interact with the PostgreSQL database
 def start_database(query, parameters=()):
     # Connect to the PostgreSQL database using the given credentials
-    conn = psycopg2.connect(
-        dbname="studentdb",  # Name of the database
-        user="postgres",  # Database username
-        password="Target@database",  # Database password
-        host="localhost",  # Database host (usually localhost for local development)
-        port="5432"  # Port where PostgreSQL is listening (default: 5432)
-    )
+    try:
+        conn = psycopg2.connect(
+            dbname="studentdb",  # Name of the database
+            user="postgres",  # Database username
+            password="Target@database",  # Database password
+            host="localhost",  # Database host (usually localhost for local development)
+            port="5432"  # Port where PostgreSQL is listening (default: 5432)
+        )
+    except psycopg2.Error as e:
+        messagebox.showerror("Database Connection Error", str(e))
+        return None
 
     # Create a cursor to execute SQL commands
     cur = conn.cursor()
@@ -29,7 +32,6 @@ def start_database(query, parameters=()):
             query_result = cur.fetchall()
 
         conn.commit()  # Commit the transaction to save any changes
-
         print("Connected successfully!")  # Print a success message to the console
 
     except psycopg2.Error as e:
@@ -42,7 +44,6 @@ def start_database(query, parameters=()):
 
     return query_result  # Return the result of the query, if applicable
 
-
 # Function to refresh the tree view with student records
 def refresh_treeview():
     # Delete all items in the treeview to avoid duplicates
@@ -50,50 +51,57 @@ def refresh_treeview():
         tree.delete(item)
 
     # Retrieve all student records from the database
-    records = start_database("select * from students;")
+    records = start_database("SELECT * FROM students;")
 
-    # Insert each record into the tree view
-    for record in records:
-        tree.insert('', END, values=record)
-
+    if records:  # Check if records were retrieved
+        # Insert each record into the tree view
+        for record in records:
+            tree.insert('', END, values=record)
 
 # Function to insert new student data into the database
 def insert_data():
     # Define the SQL query to insert new student data into the students table
-    query = "insert into students(name, address, age, number) values (%s, %s, %s, %s)"
+    query = "INSERT INTO students(name, address, age, number) VALUES (%s, %s, %s, %s)"
 
     # Gather the data from the input fields (name, address, age, number)
-    parameters = (name_entry.get(), address_entry.get(), age_entry.get(), student_number_entry.get())
+    parameters = (name_entry.get().strip(), address_entry.get().strip(), age_entry.get().strip(), student_number_entry.get().strip())
+
+    # Ensure that all fields are filled before inserting
+    if not all(parameters):
+        messagebox.showwarning("Warning", "All fields must be filled.")
+        return
 
     # Execute the query with the inputted parameters
     start_database(query, parameters)
 
     # Show a success message when the record is inserted
-    messagebox.showinfo("Information: Records Inserted Successfully!")
+    messagebox.showinfo("Information", "Records Inserted Successfully!")
 
     # Refresh the treeview to display the newly added data
     refresh_treeview()
 
-
 # Function to delete the selected student record from the database
 def delete_data():
     # Get the currently selected item in the treeview
-    selected_item = tree.selection()[0]
-    student_id = tree.item(selected_item)['values'][0]  # Extract the student's ID
+    selected_item = tree.selection()
+    if not selected_item:
+        messagebox.showwarning("Warning", "No student selected for deletion.")
+        return
+
+    student_id = tree.item(selected_item[0])['values'][0]  # Extract the student's ID
 
     # Define the SQL query to delete the student record based on the student ID
-    query = "delete from students where student_id=%s"
+    query = "DELETE FROM students WHERE student_id=%s"
     parameters = (student_id,)  # Use the student's ID as the parameter
 
     # Execute the query to delete the student record
     start_database(query, parameters)
 
     # Show a success message indicating that the record has been deleted
-    messagebox.showinfo("Data Deleted Successfully")
+    messagebox.showinfo("Information", "Data Deleted Successfully")
 
     # Refresh the treeview to remove the deleted record
     refresh_treeview()
-
 
 # Function to update existing student data in the database
 def update_data():
@@ -133,7 +141,6 @@ def update_data():
 
     # Refresh the treeview to reflect the updated data
     refresh_treeview()
-
 
 # Initialize the main Tkinter window
 root = Tk()
